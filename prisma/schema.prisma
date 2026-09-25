@@ -1,0 +1,240 @@
+// OK Shop - Prisma Database Schema
+// Optimized for PostgreSQL / SQLite cross-compatibility
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // Change to "postgresql" for PostgreSQL in production
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(uuid())
+  email          String          @unique
+  passwordHash   String?
+  name           String
+  phone          String?
+  documentType   String?         // CC, CE, NIT, Pasaporte
+  documentNumber String?
+  role           String          @default("CUSTOMER") // CUSTOMER, ADMIN, SUPPORT, LOGISTICS
+  addresses      Address[]
+  paymentMethods PaymentMethod[]
+  orders         Order[]
+  pqrsList       PQRS[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Address {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String   // Casa, Oficina, Bodega
+  recipient    String
+  phone        String
+  department   String   // e.g., Cundinamarca, Antioquia, Valle del Cauca
+  city         String   // e.g., Bogotá D.C., Medellín, Cali
+  addressLine  String   // e.g., Calle 100 # 15-20 Apto 402
+  neighborhood String?  // e.g., Chicó Norte
+  postalCode   String?
+  isDefault    Boolean  @default(false)
+  orders       Order[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model PaymentMethod {
+  id          String      @id @default(uuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String      // CREDIT_CARD, PSE, NEQUI, DAVIPLATA, BANK_TRANSFER, CASH_ON_DELIVERY
+  label       String      // e.g. "Visa terminada en 4242", "Nequi 301***"
+  lastFour    String?
+  provider    String?
+  isDefault   Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+}
+
+model Category {
+  id            String        @id @default(uuid())
+  name          String        @unique
+  slug          String        @unique
+  description   String?
+  icon          String?       // Lucide icon name
+  image         String?
+  displayOrder  Int           @default(0)
+  active        Boolean       @default(true)
+  subcategories Subcategory[]
+  products      Product[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Subcategory {
+  id          String    @id @default(uuid())
+  categoryId  String
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name        String
+  slug        String
+  description String?
+  image       String?
+  active      Boolean   @default(true)
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([categoryId, slug])
+}
+
+model Product {
+  id                   String           @id @default(uuid())
+  name                 String
+  slug                 String           @unique
+  sku                  String           @unique
+  shortDescription     String?
+  description          String
+  categoryId           String
+  category             Category         @relation(fields: [categoryId], references: [id])
+  subcategoryId        String?
+  subcategory          Subcategory?     @relation(fields: [subcategoryId], references: [id])
+  regularPrice         Float            // Regular market price (COP)
+  offerPrice           Float            // Promotional catalog price (COP)
+  specialTransferPrice Float            // Special price for Transfer/Nequi/PSE (COP)
+  inStock              Boolean          @default(true)
+  stockQuantity        Int              @default(10)
+  isFlashDeal          Boolean          @default(false)
+  flashDealEndsAt      DateTime?
+  featured             Boolean          @default(false)
+  rating               Float            @default(4.8)
+  reviewsCount         Int              @default(12)
+  tags                 String?          // Comma-separated tags
+  images               ProductImage[]
+  variants             ProductVariant[]
+  orderItems           OrderItem[]
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+}
+
+model ProductImage {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  altText   String?
+  isPrimary Boolean  @default(false)
+  order     Int      @default(0)
+}
+
+model ProductVariant {
+  id              String      @id @default(uuid())
+  productId       String
+  product         Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku             String      @unique
+  name            String      // e.g. "Color: Rojo / Rin 29"
+  additionalPrice Float       @default(0)
+  stockQuantity   Int         @default(5)
+  attributesJson  String?     // JSON representation of attributes
+  orderItems      OrderItem[]
+}
+
+model Order {
+  id                   String         @id @default(uuid())
+  orderNumber          String         @unique // e.g., OK-2026-8941
+  userId               String?
+  user                 User?          @relation(fields: [userId], references: [id])
+  customerName         String
+  customerEmail        String
+  customerPhone        String
+  shippingAddressId    String?
+  shippingAddress      Address?       @relation(fields: [shippingAddressId], references: [id])
+  shippingDepartment   String
+  shippingCity         String
+  shippingAddressLine  String
+  shippingNotes        String?
+  subtotal             Float
+  shippingCost         Float          @default(0)
+  discountAmount       Float          @default(0)
+  totalAmount          Float
+  paymentType          String         // CREDIT_CARD, PSE, NEQUI, DAVIPLATA, BANK_TRANSFER, CASH_ON_DELIVERY
+  paymentStatus        String         @default("PENDING") // PENDING, PAID, FAILED, REFUNDED
+  orderStatus          String         @default("RECEIVED") // RECEIVED, PROCESSING, DISPATCHED, IN_TRANSIT, DELIVERED, CANCELLED
+  couponCode           String?
+  trackingCarrier      String?        // Servientrega, Coordinadora, Envía, Inter Rapidísimo
+  trackingNumber       String?
+  estimatedDelivery    DateTime?
+  items                OrderItem[]
+  invoice              Invoice?
+  timelineJson         String?        // JSON of milestone dates & notes
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+}
+
+model OrderItem {
+  id         String          @id @default(uuid())
+  orderId    String
+  order      Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id])
+  variantId  String?
+  variant    ProductVariant? @relation(fields: [variantId], references: [id])
+  name       String
+  price      Float
+  quantity   Int
+  total      Float
+}
+
+model Invoice {
+  id                 String    @id @default(uuid())
+  invoiceNumber      String    @unique // e.g. "FE-OK-2026-000841"
+  orderId            String    @unique
+  order              Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  cufe               String    // Código Único de Facturación Electrónica DIAN
+  qrCodeData         String    // DIAN QR string validation
+  dianResolution     String    // Resolución DIAN de Facturación
+  issuedAt           DateTime  @default(now())
+  customerName       String
+  customerDocType    String    // CC, NIT, CE
+  customerDocNumber  String
+  customerEmail      String
+  customerAddress    String
+  subtotal           Float
+  ivaAmount          Float     // 19% IVA standard Colombia
+  totalAmount        Float
+  status             String    @default("ISSUED") // ISSUED, DIAN_VALIDATED
+  pdfUrl             String?
+  xmlUrl             String?
+}
+
+model PQRS {
+  id           String      @id @default(uuid())
+  radicado     String      @unique // e.g., PQRS-2026-9218
+  userId       String?
+  user         User?       @relation(fields: [userId], references: [id])
+  type         String      // PETICION, QUEJA, RECLAMO, SUGERENCIA
+  customerName String
+  email        String
+  phone        String
+  orderNumber  String?
+  subject      String
+  description  String
+  status       String      @default("RECEIVED") // RECEIVED, UNDER_REVIEW, RESOLVED, CLOSED
+  response     String?
+  responseDate DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model Coupon {
+  id              String    @id @default(uuid())
+  code            String    @unique
+  discountPercent Float?    // e.g., 10 for 10%
+  discountFixed   Float?    // e.g., 20000 for $20,000 COP
+  minPurchase     Float     @default(0)
+  maxUses         Int       @default(100)
+  usedCount       Int       @default(0)
+  active          Boolean   @default(true)
+  expiresAt       DateTime
+  createdAt       DateTime  @default(now())
+}
