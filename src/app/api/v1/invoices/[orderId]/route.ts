@@ -6,10 +6,11 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { orderId: string } }
+  { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
-    const orderIdentifier = decodeURIComponent(params.orderId).trim();
+    const { orderId } = await params;
+    const orderIdentifier = decodeURIComponent(orderId).trim();
 
     let invoice: any = null;
     let order: any = null;

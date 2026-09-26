@@ -5,10 +5,11 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { radicado: string } }
+  { params }: { params: Promise<{ radicado: string }> }
 ) {
   try {
-    const rawRadicado = decodeURIComponent(params.radicado).trim();
+    const { radicado } = await params;
+    const rawRadicado = decodeURIComponent(radicado).trim();
 
     if (!rawRadicado) {
       return NextResponse.json(
