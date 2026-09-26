@@ -1,17 +1,17 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Cargando datos iniciales en la base de datos...')
+  console.log('Cargando datos iniciales en la base de datos...');
 
-  // 1. Limpiar registros relacionados primero para evitar violaciones de clave foránea
-  await prisma.orderItem.deleteMany({})
-  await prisma.productVariant.deleteMany({})
-  await prisma.productImage.deleteMany({})
-  await prisma.product.deleteMany({})
-  await prisma.subcategory.deleteMany({})
-  await prisma.category.deleteMany({})
+  // 1. Limpiar registros relacionados en orden para evitar violaciones de clave foránea
+  await prisma.orderItem.deleteMany({});
+  await prisma.productVariant.deleteMany({});
+  await prisma.productImage.deleteMany({});
+  await prisma.product.deleteMany({});
+  await prisma.subcategory.deleteMany({});
+  await prisma.category.deleteMany({});
 
   // 2. Crear Categoría base
   const categoria = await prisma.category.create({
@@ -21,7 +21,7 @@ async function main() {
       description: 'Productos de tecnología y electrónica',
       active: true,
     },
-  })
+  });
 
   // 3. Crear Productos de prueba
   await prisma.product.create({
@@ -47,7 +47,7 @@ async function main() {
         ],
       },
     },
-  })
+  });
 
   await prisma.product.create({
     data: {
@@ -72,17 +72,16 @@ async function main() {
         ],
       },
     },
-  })
+  });
 
-  console.log('¡Base de datos poblada con éxito!')
+  console.log('¡Base de datos poblada con éxito!');
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
   })
-  .catch(async (e) => {
-    console.error(e)
-    await prisma.$disconnect()
-    process.exit(1)
-  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
